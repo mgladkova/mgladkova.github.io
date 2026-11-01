@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>VINE — Mariia Gladkova</title>
+    <meta
+      name="description"
+      content="VINE: Variable Input N-view Encoder for 3D Generation from Partial Posed Observations. Mariia Gladkova and Daniel Cremers, Technical University of Munich."
+    />
+    <link rel="icon" href="data:," />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="../../static/css/style.css" />
+    <link rel="stylesheet" href="../../static/css/project.css" />
+  </head>
+  <body>
+    <div class="page project">
+      <a class="back-link" href="../../index.html#publications">&larr; Back to publications</a>
+
+      <header class="project__header">
+        <h1>VINE: Variable Input N-view Encoder for 3D Generation from Partial Posed Observations</h1>
+        <p class="project__authors">
+          <a href="../../index.html"><strong>Mariia Gladkova</strong></a>,
+          <a href="https://cvg.cit.tum.de/members/cremers" target="_blank" rel="noopener">Daniel Cremers</a>
+        </p>
+        <p class="project__affil">Technical University of Munich</p>
+        <ul class="pill-links">
+          <li>
+            <a href="vine.pdf" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm7 1.5V9h5.5L13 3.5ZM8 13v2h8v-2H8Zm0 4v2h5v-2H8Z"/></svg>
+              Paper (PDF)
+            </a>
+          </li>
+          <li>
+            <a href="#citation">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v2H4V5Zm0 6h16v2H4v-2Zm0 6h10v2H4v-2Z"/></svg>
+              BibTeX
+            </a>
+          </li>
+        </ul>
+      </header>
+
+      <section class="section">
+        <figure class="figure">
+          <img
+            src="img/teaser.jpg"
+            alt="A ScanNet++ chair from four partial views and a Replica lamp from two partial views: VINE reconstructs complete shapes while TRELLIS-S, TRELLIS-M and ReconViaGen produce fragments or distorted shapes"
+          />
+          <figcaption class="figure__caption">
+            <strong>Given <em>N</em> partial posed captures of an object, VINE fuses them into a single shape consistent with all inputs.</strong>
+            Tuning-free multi-view adaptations of the same frozen TRELLIS backbone (TRELLIS-S/M) collapse when the conditioning views cover disjoint
+            regions, and the VGGT-conditioned ReconViaGen degrades without sufficiently distinctive co-visible overlap.
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section">
+        <h2 class="section__title">Abstract</h2>
+        <p>
+          Image-to-3D models produce compelling shapes from a single image but hallucinate unobserved regions. When an object is captured from several
+          viewpoints with partial observability, these hallucinations contradict the other views. Extending such models from single- to multi-view input
+          is non-trivial: the number of views varies per capture, and partial observations cover disjoint regions, for which naive aggregation is
+          insufficient to compose complementary evidence. We present VINE, a lightweight multi-view extension of a two-stage rectified-flow model for
+          structured 3D latent generation. VINE introduces a multi-view encoder that processes an arbitrary number of posed images, encoding the full
+          camera frustum as relative positional biases for geometrically consistent cross-view aggregation. The generation stages receive deliberately
+          different conditioning: geometry relies on cross-view exchange to resolve shape from partial evidence, while texture preserves per-view detail
+          and gains little from such exchange. We adapt the frozen denoiser with LoRA and a curriculum that gradually increases the number of input views,
+          training on a single H100 with 16K instances. Because input poses are supplied by the capture system, VINE conditions on them directly rather
+          than estimating them from sparse cross-view correspondence. Under a partial-observation evaluation protocol on Toys4K and OmniObject3D, VINE
+          surpasses tuning-free single-view TRELLIS adaptations. Our model matches depth-conditioned methods on geometry while significantly improving
+          rendered texture, using posed images alone, and extends to sparse-view scene reconstruction, where it significantly improves geometry over
+          depth-conditioned baselines on ScanNet++.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2 class="section__title">Method</h2>
+        <p class="section__lead">
+          VINE extends the two-stage TRELLIS image-to-3D model to an arbitrary number of posed views. Per-view DINOv2 features pass through a lightweight
+          multi-view encoder with camera-aware attention and condition the frozen denoisers through LoRA adapters.
+        </p>
+        <figure class="figure">
+          <img
+            src="img/pipeline.jpg"
+            alt="VINE pipeline: per-view DINOv2 features with camera parameters feed a PRoPE-based Sparse Structure encoder that pools views for the occupancy denoiser, and a GTA-based SLAT encoder that keeps per-view tokens for cross-attention in the texture denoiser"
+          />
+          <figcaption class="figure__caption">
+            <strong>Stage 1 (Sparse Structure)</strong> exchanges information across views with PRoPE attention, which encodes each camera's full
+            frustum, and pools the views into one conditioning sequence for the occupancy denoiser. <strong>Stage 2 (SLAT)</strong> keeps one token set
+            per view, and every denoiser block cross-attends to each of them so per-view texture detail is preserved.
+          </figcaption>
+        </figure>
+        <div class="cards" style="margin-top: 24px">
+          <div class="card">
+            <span class="card__num">01</span>
+            <h3>Camera-aware multi-view encoder</h3>
+            <p>
+              Full attention over all views' tokens, with intrinsics and extrinsics injected as relative projective transforms (PRoPE), lets the model
+              relate patches across views geometrically. It takes any number of views.
+            </p>
+          </div>
+          <div class="card">
+            <span class="card__num">02</span>
+            <h3>Different conditioning for geometry and texture</h3>
+            <p>
+              Geometry depends on cross-view exchange to resolve occupancy from partial evidence. Texture depends on keeping each view's tokens intact,
+              because pooling blurs view-specific appearance.
+            </p>
+          </div>
+          <div class="card">
+            <span class="card__num">03</span>
+            <h3>Lightweight adaptation</h3>
+            <p>
+              The 1.2B-parameter backbone stays frozen. LoRA plus the encoder train 5&ndash;7% of each denoiser's parameters, on a single H100 with
+              16K instances. A curriculum raises the number of input views from 1 to 8.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section__title">A Partial-Observation Benchmark</h2>
+        <p>
+          Standard image-to-3D benchmarks condition on views that cover the full object. In that setting, a model that hallucinates well cannot be told
+          apart from one that reconstructs faithfully. We instead select, from a 24-camera pool, the <em>N</em> &isin; {1, 2, 4, 8} views that minimize
+          coverage. Each view on its own sees only 72&ndash;87% of the object silhouette, but by <em>N</em> = 4 the views together cover nearly all of
+          it. Method rankings under this protocol are <em>anti-correlated</em> with rankings under a full-coverage protocol on the same instances, so it
+          measures something that standard benchmarks miss: whether a model fuses complementary evidence.
+        </p>
+      </section>
+
+      <section class="section" id="results">
+        <h2 class="section__title">Results</h2>
+        <p class="section__lead">
+          Every clip is a 360&deg; orbit around a reconstructed 3D model, and the clips in each row play in sync. The leftmost column shows the posed input
+          views that every method receives. Videos load as you scroll.
+        </p>
+
+        <div class="breakout">
+          <h3 class="subsection__title">Toys4K &mdash; synthetic objects</h3>
+          <div data-compare="toys4k"></div>
+        </div>
+
+        <div class="breakout">
+          <h3 class="subsection__title">Replica &mdash; objects in real indoor scenes</h3>
+          <div data-compare="replica"></div>
+        </div>
+
+        <div class="breakout">
+          <h3 class="subsection__title">ScanNet++ &mdash; objects in real indoor scenes</h3>
+          <div data-compare="scannetpp"></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section__title">Quantitative Results</h2>
+        <p class="section__lead">
+          Partial-view Toys4K benchmark (200 instances), averaged over <em>N</em> &isin; {1, 2, 4, 8}. SAM3D variants also receive a metric depth
+          estimate, while VINE uses posed RGB images only. Per-<em>N</em> results and significance tests are in the paper.
+        </p>
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th colspan="3">Toys4K</th>
+              </tr>
+              <tr>
+                <th>Method</th>
+                <th>CD&times;100 &darr;</th>
+                <th>F@.02 &uarr;</th>
+                <th>PSNR &uarr;</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Amodal3R</td><td>4.74</td><td>0.408</td><td>12.40</td></tr>
+              <tr><td>ReconViaGen</td><td>7.11</td><td>0.313</td><td>16.42</td></tr>
+              <tr><td>TRELLIS-S</td><td>5.75</td><td>0.397</td><td>16.86</td></tr>
+              <tr><td>TRELLIS-M</td><td>5.45</td><td>0.413</td><td>17.12</td></tr>
+              <tr><td>SAM3D-M</td><td class="best">3.06</td><td>0.544</td><td>18.28</td></tr>
+              <tr><td>SAM3D-S</td><td>3.07</td><td>0.541</td><td>18.21</td></tr>
+              <tr><td>MV-SAM3D</td><td>3.38</td><td>0.544</td><td>18.11</td></tr>
+              <tr>
+                <td>VINE (ours)</td>
+                <td>3.09</td>
+                <td class="best">0.563</td>
+                <td class="best">18.45</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="section__lead" style="margin-top: 32px">
+          Object reconstruction in real scenes from the DP-Recon benchmarks, after multi-start ICP with isotropic scale alignment. MV-SAM3D* uses its
+          own predicted pose.
+        </p>
+        <div class="table-wrap">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th colspan="2">Replica</th>
+                <th colspan="2">ScanNet++</th>
+              </tr>
+              <tr>
+                <th>Method</th>
+                <th>CD&times;100 &darr;</th>
+                <th>F@.05 &uarr;</th>
+                <th>CD&times;100 &darr;</th>
+                <th>F@.05 &uarr;</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>MV-SAM3D*</td><td>62.13</td><td>0.057</td><td>62.00</td><td>0.061</td></tr>
+              <tr><td>TRELLIS-M</td><td>9.26</td><td>0.533</td><td>7.58</td><td>0.620</td></tr>
+              <tr><td>ReconViaGen</td><td>6.36</td><td>0.604</td><td>5.89</td><td>0.627</td></tr>
+              <tr><td>SAM3D-M</td><td>5.24</td><td>0.651</td><td>4.62</td><td>0.676</td></tr>
+              <tr><td>MV-SAM3D + ICP</td><td>4.79</td><td>0.689</td><td>4.69</td><td>0.671</td></tr>
+              <tr>
+                <td>VINE (ours)</td>
+                <td class="best">4.40</td>
+                <td class="best">0.710</td>
+                <td class="best">3.89</td>
+                <td class="best">0.695</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="citation">
+        <h2 class="section__title">Citation</h2>
+        <pre class="bibtex">
+@misc{gladkova2026vine,
+  title  = {{VINE}: Variable Input N-view Encoder for 3D Generation from Partial Posed Observations},
+  author = {Gladkova, Mariia and Cremers, Daniel},
+  year   = {2026}
+}</pre
+        >
+      </section>
+    </div>
+    <script src="vine.js"></script>
+  </body>
+</html>
